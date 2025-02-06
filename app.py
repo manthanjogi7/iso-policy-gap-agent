@@ -1,22 +1,29 @@
 import streamlit as st
-
-# 🔹 Force install PyMuPDF (fitz) if missing
 import subprocess
 import sys
 
+# 🔹 Check and install PyMuPDF (fitz) if missing
 try:
     import fitz  # PyMuPDF for PDF text extraction
 except ModuleNotFoundError:
     st.warning("PyMuPDF not found. Installing it now...")
     subprocess.call([sys.executable, "-m", "pip", "install", "PyMuPDF"])
-    import fitz  # Try importing again after installation
+    
+    # Verify installation
+    installed_packages = subprocess.run(["pip", "list"], capture_output=True, text=True)
+    st.text("Installed Packages:\n" + installed_packages.stdout)
+    
+    try:
+        import fitz  # Try importing again after installation
+    except ModuleNotFoundError:
+        st.error("Installation failed. PyMuPDF is still missing.")
+        sys.exit(1)
 
 from langchain_deepseek import ChatDeepSeek
 
 # Function to extract text from PDF
 def extract_text_from_pdf_stream(file_obj):
     """Extract text from a PDF file uploaded via Streamlit uploader."""
-    # file_obj is a BytesIO stream; open it with fitz
     doc = fitz.open("pdf", file_obj.read())
     full_text = ""
     for page in doc:
