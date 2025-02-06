@@ -1,10 +1,22 @@
 import streamlit as st
-import fitz  # PyMuPDF for PDF text extraction
+
+# 🔹 Force install PyMuPDF (fitz) if missing
+import subprocess
+import sys
+
+try:
+    import fitz  # PyMuPDF for PDF text extraction
+except ModuleNotFoundError:
+    st.warning("PyMuPDF not found. Installing it now...")
+    subprocess.call([sys.executable, "-m", "pip", "install", "PyMuPDF"])
+    import fitz  # Try importing again after installation
+
 from langchain_deepseek import ChatDeepSeek
 
+# Function to extract text from PDF
 def extract_text_from_pdf_stream(file_obj):
-    """Extract text from a PDF file provided via Streamlit uploader."""
-    # file_obj is a BytesIO stream; open it with fitz by specifying the stream type.
+    """Extract text from a PDF file uploaded via Streamlit uploader."""
+    # file_obj is a BytesIO stream; open it with fitz
     doc = fitz.open("pdf", file_obj.read())
     full_text = ""
     for page in doc:
@@ -12,6 +24,7 @@ def extract_text_from_pdf_stream(file_obj):
     doc.close()
     return full_text
 
+# Function to create the gap analysis prompt
 def create_gap_analysis_prompt(isms_text, iso_excerpt):
     """Combine the ISO excerpt and the ISMS policy text into one prompt."""
     prompt = f"""
@@ -29,6 +42,7 @@ Output the report in a clear, structured format.
 """
     return prompt
 
+# Function to call DeepSeek API and generate a policy gap analysis report
 def get_gap_analysis_report(prompt, api_key):
     """Call DeepSeek's chat model to generate a gap analysis report."""
     llm = ChatDeepSeek(
@@ -44,6 +58,7 @@ def get_gap_analysis_report(prompt, api_key):
     response = llm.invoke(messages)
     return response.content
 
+# Streamlit UI
 def main():
     st.title("ISO 27001 Policy Gap Analysis Agent")
     st.write("Upload your ISMS policy PDF, paste the ISO 27001 excerpt, and enter your DeepSeek API key. Click the button to generate the gap analysis report.")
