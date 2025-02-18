@@ -1,10 +1,13 @@
-import streamlit as st
+import sys
+import argparse
 import fitz  # PyMuPDF for PDF text extraction
 from transformers import pipeline
 
-def extract_text_from_pdf_stream(file_obj):
-    """Extract text from a PDF file provided via Streamlit uploader."""
-    doc = fitz.open("pdf", file_obj.read())
+def extract_text_from_pdf(pdf_path):
+    """
+    Extracts text from a PDF file given its file path.
+    """
+    doc = fitz.open(pdf_path)
     full_text = ""
     for page in doc:
         full_text += page.get_text() + "\n"
@@ -12,7 +15,9 @@ def extract_text_from_pdf_stream(file_obj):
     return full_text
 
 def create_gap_analysis_prompt(isms_text, iso_excerpt):
-    """Combine the ISO excerpt and the ISMS policy text into a prompt."""
+    """
+    Combines the ISO excerpt and the ISMS text into one prompt.
+    """
     prompt = f"""
 You are an ISO 27001 compliance expert. The following is an excerpt from the ISO 27001 standard:
 {iso_excerpt}
@@ -29,39 +34,40 @@ Output the report in a clear, structured format.
     return prompt
 
 def get_gap_analysis_report(prompt):
-    """Uses the Hugging Face Transformers pipeline with a free chat model to generate the gap analysis report."""
-    generator = pipeline("text-generation", model="meta-llama/Llama-2-7b-chat-hf", device=-1)
+    """
+    Uses the Hugging Face Transformers pipeline with the free model "distilgpt2"
+    to generate the gap analysis report.
+    """
+    generator = pipeline("text-generation", model="distilgpt2", device=-1)
     response = generator(prompt, max_length=1000, do_sample=True, temperature=0.7)
     return response[0]["generated_text"]
 
 def main():
-    st.title("ISO 27001 Policy Gap Analysis Agent (Free LLM)")
-    st.write("Upload your ISMS policy PDF, paste the ISO 27001 excerpt, and click the button to generate the gap analysis report using a free, open-source LLM.")
+    parser = argparse.ArgumentParser(description="ISO 27001 Policy Gap Analysis Agent (CLI - Free LLM)")
+    parser.add_argument("--pdf", required=True, help="Path to the ISMS policy PDF document")
+    parser.add_argument("--iso_excerpt", required=True, help="Path to a text file containing the ISO 27001 excerpt")
+    args = parser.parse_args()
 
-    uploaded_pdf = st.file_uploader("Upload ISMS PDF", type=["pdf"])
-    iso_excerpt = st.text_area("ISO 27001 Excerpt", value="[Paste your ISO 27001 excerpt here]")
-    # API key is optional in this free LLM setup; you can remove the field if desired.
-    api_key = st.text_input("(Optional) API Key", type="password")
+    try:
+        isms_text = extract_text_from_pdf(args.pdf)
+    except Exception as e:
+        print(f"Error extracting text from PDF: {e}")
+        sys.exit(1)
 
-    if st.button("Run Gap Analysis"):
-        if not uploaded_pdf:
-            st.error("Please upload a PDF file.")
-        elif not iso_excerpt.strip():
-            st.error("Please enter the ISO 27001 excerpt.")
-        else:
-            st.info("Extracting text from PDF...")
-            isms_text = extract_text_from_pdf_stream(uploaded_pdf)
-            prompt = create_gap_analysis_prompt(isms_text, iso_excerpt)
-            st.info("Generating gap analysis report using free LLM...")
-            report = get_gap_analysis_report(prompt)
-            st.subheader("Policy Gap Analysis Report")
-            st.text_area("Report Output", value=report, height=400)
-            st.download_button(
-                label="Download Report",
-                data=report,
-                file_name="policy_gap_analysis_report.txt",
-                mime="text/plain"
-            )
+    try:
+        with open(args.iso_excerpt, "r", encoding="utf-8") as f:
+            iso_excerpt_text = f.read()
+    except Exception as e:
+        print(f"Error reading ISO excerpt file: {e}")
+        sys.exit(1)
+
+    prompt = create_gap_analysis_prompt(isms_text, iso_excerpt_text)
+    print("Generating policy gap analysis report using free LLM...")
+    report = get_gap_analysis_report(prompt)
+    output_file = "policy_gap_analysis_report.txt"
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(report)
+    print(f"Policy gap analysis report saved to {output_file}")
 
 if __name__ == "__main__":
     main()
